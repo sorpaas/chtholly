@@ -18,6 +18,7 @@ use core::cmp::{min, max};
 use alloc::vec::Vec;
 
 /// Representation of Chtholly Node, used to build Chtholly Tree.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ChthollyNode {
     left: usize,
     right: usize,
@@ -37,7 +38,7 @@ impl ChthollyNode {
 }
 
 /// Representation of Chtholly Tree. The nodes are sorted by their range.
-#[derive(Default)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ChthollyTree(Vec<ChthollyNode>);
 
 impl ChthollyTree {
@@ -64,17 +65,29 @@ impl ChthollyTree {
     /// Set all values between `[left, right]` to be `value`, and merge them.
     /// Split nodes when necessary. Create a new node if it does not yet exist.
     pub fn merge(&mut self, left: usize, right: usize, value: u64) {
-        self.split_inner(right);
         let index = self.split_inner(left);
+        let end = self.split_inner(right + 1);
 
         match index {
             Some(index) => {
                 self.0[index].value = value;
                 self.0[index].right = right;
 
-                while index + 1 < self.0.len() && self.0[index + 1].left <= right {
-                    self.0.remove(index + 1);
+                debug_assert!(self.0[index].left <= self.0[index].right);
+
+                match end {
+                    None => {
+                        while index + 1 < self.0.len() && self.0[index + 1].left <= right {
+                            self.0.remove(index + 1);
+                        }
+                    },
+                    Some(end) => {
+                        self.0.drain((index + 1)..end);
+                    },
                 }
+
+                debug_assert!(index + 1 >= self.0.len() ||
+                              self.0[index + 1].left == self.0[index].right + 1);
             },
             None => {
                 self.0.push(ChthollyNode { left, right, value });
@@ -85,7 +98,7 @@ impl ChthollyTree {
 
     /// Add `x` to all values between `[left, right]`.
     pub fn add(&mut self, left: usize, right: usize, value: u64) {
-        self.split_inner(right);
+        self.split_inner(right + 1);
         let start = match self.split_inner(left) {
             Some(start) => start,
             None => return,
@@ -101,7 +114,7 @@ impl ChthollyTree {
     }
 
     /// Find `n`-th (0-indexed) smallest `value` after `left`.
-    pub fn nth(&self, left: usize, mut x: usize) -> Option<u64> {
+    pub fn nth(&self, left: usize, right: usize, mut n: usize) -> Option<u64> {
         let mut index = match self.0.binary_search_by(|node| {
             node.left.cmp(&left)
         }) {
@@ -115,23 +128,35 @@ impl ChthollyTree {
             },
         };
 
+        let mut values = Vec::new();
+
         loop {
-            if x == 0 {
-                return Some(self.0[index].value)
+            if index >= self.0.len() || self.0[index].left > right {
+                break
             }
 
-            let len = self.0[index].right - max(left, self.0[index].left) + 1;
+            let left = max(left, self.0[index].left);
+            let right = min(right, self.0[index].right);
+            let len = right - left + 1;
 
-            if x < len {
-                return Some(self.0[index].value)
-            }
+            values.push((len, self.0[index].value));
+            index += 1;
+        }
 
-            if index + 1 >= self.0.len() {
+        values.sort_unstable_by_key(|(_, v)| *v);
+
+        let mut target = 0;
+        loop {
+            if target >= values.len() {
                 return None
             }
 
-            x -= len;
-            index += 1;
+            if n < values[target].0 || n == 0 {
+                return Some(values[target].1)
+            }
+
+            n -= values[target].0;
+            target += 1;
         }
     }
 
@@ -194,14 +219,24 @@ impl ChthollyTree {
             return Some(index)
         }
 
+        if self.0[index].right < middle {
+            return None
+        }
+
         let new = ChthollyNode {
             left: middle,
             right: self.0[index].right,
             value: self.0[index].value,
         };
 
+        debug_assert!(new.left <= new.right);
+
         self.0.insert(index + 1, new);
-        self.0[index].right = middle;
+        self.0[index].right = middle - 1;
+
+        debug_assert!(index + 1 < self.0.len() ||
+                      self.0[index + 1].left == self.0[index].right + 1);
+        debug_assert!(self.0[index].left <= self.0[index].right);
 
         Some(index + 1)
     }
@@ -319,8 +354,8 @@ mod tests {
                 Op::Assign(l, r, x) => {
                     tree.merge(l - 1, r - 1, x);
                 },
-                Op::Nth(l, _r, x) => {
-                    let n = tree.nth(l - 1, x - 1).expect("Vector test failed to find n");
+                Op::Nth(l, r, x) => {
+                    let n = tree.nth(l - 1, r - 1, x - 1).expect("Vector test failed to find n");
                     output.push(n);
                 },
                 Op::PowSum(l, r, x, y) => {
