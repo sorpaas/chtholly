@@ -21,7 +21,7 @@ use alloc::vec::Vec;
 pub struct ChthollyNode {
     left: usize,
     right: usize,
-    value: usize,
+    value: u64,
 }
 
 impl ChthollyNode {
@@ -42,7 +42,7 @@ pub struct ChthollyTree(Vec<ChthollyNode>);
 
 impl ChthollyTree {
     /// Generate a new Chtholly Tree from a slice.
-    pub fn from_slice(data: &[usize]) -> Self {
+    pub fn from_slice(data: &[u64]) -> Self {
         Self(data.iter().enumerate().map(|(i, d)| {
             ChthollyNode {
                 left: i,
@@ -63,7 +63,7 @@ impl ChthollyTree {
 
     /// Set all values between `[left, right]` to be `value`, and merge them.
     /// Split nodes when necessary. Create a new node if it does not yet exist.
-    pub fn merge(&mut self, left: usize, right: usize, value: usize) {
+    pub fn merge(&mut self, left: usize, right: usize, value: u64) {
         self.split_inner(right);
         let index = self.split_inner(left);
 
@@ -84,7 +84,7 @@ impl ChthollyTree {
     }
 
     /// Add `x` to all values between `[left, right]`.
-    pub fn add(&mut self, left: usize, right: usize, value: usize) {
+    pub fn add(&mut self, left: usize, right: usize, value: u64) {
         self.split_inner(right);
         let start = match self.split_inner(left) {
             Some(start) => start,
@@ -101,7 +101,7 @@ impl ChthollyTree {
     }
 
     /// Find `n`-th (0-indexed) smallest `value` after `left`.
-    pub fn nth(&self, left: usize, mut x: usize) -> Option<usize> {
+    pub fn nth(&self, left: usize, mut x: usize) -> Option<u64> {
         let mut index = match self.0.binary_search_by(|node| {
             node.left.cmp(&left)
         }) {
@@ -136,7 +136,7 @@ impl ChthollyTree {
     }
 
     /// Compute the sum of power between `[left, right]`.
-    pub fn pow_sum(&self, left: usize, right: usize, power: u32, modulo: usize) -> usize {
+    pub fn pow_sum(&self, left: usize, right: usize, power: u32, modulo: u64) -> u64 {
         let mut index = match self.0.binary_search_by(|node| {
             node.left.cmp(&left)
         }) {
@@ -160,7 +160,7 @@ impl ChthollyTree {
             let right = min(right, self.0[index].right);
             let len = right - left + 1;
 
-            sum = (sum + len * (self.0[index].value.pow(power) % modulo)) % modulo;
+            sum = (sum + len as u64 * mod_pow(self.0[index].value, power, modulo)) % modulo;
             index += 1;
         }
         sum
@@ -207,6 +207,21 @@ impl ChthollyTree {
     }
 }
 
+fn mod_pow(mut x: u64, mut n: u32, modulo: u64) -> u64 {
+    x = x % modulo;
+    let mut ret = 1 % modulo;
+
+    while n > 0 {
+        if n & 1 == 1 {
+            ret = ret * x % modulo;
+        }
+
+        x = x * x % modulo;
+        n = n >> 1;
+    }
+    ret
+}
+
 #[cfg(test)]
 #[allow(unused)]
 mod tests {
@@ -228,19 +243,19 @@ mod tests {
 
     #[derive(Clone)]
     enum Op {
-        Add(usize, usize, usize),
-        Assign(usize, usize, usize),
+        Add(usize, usize, u64),
+        Assign(usize, usize, u64),
         Nth(usize, usize, usize),
-        PowSum(usize, usize, usize, usize),
+        PowSum(usize, usize, u32, u64),
     }
 
-    fn random_array(n: usize, vmax: usize, rng: &mut CF896CRng) -> Vec<usize> {
+    fn random_array(n: usize, vmax: usize, rng: &mut CF896CRng) -> Vec<u64> {
         debug_assert!(vmax <= V_MAX_BOUND);
 
         let mut ret = Vec::new();
 
         for _ in 0..n {
-            ret.push(rng.next() % vmax + 1);
+            ret.push((rng.next() % vmax + 1) as u64);
         }
 
         ret
@@ -271,12 +286,12 @@ mod tests {
             };
 
             let op = match opi {
-                1 => Op::Add(l, r, x),
-                2 => Op::Assign(l, r, x),
+                1 => Op::Add(l, r, x as u64),
+                2 => Op::Assign(l, r, x as u64),
                 3 => Op::Nth(l, r, x),
                 4 => {
                     let y = rng.next() % vmax + 1;
-                    Op::PowSum(l, r, x, y)
+                    Op::PowSum(l, r, x as u32, y as u64)
                 },
                 _ => unreachable!("opi is modulo 4 plus 1"),
             };
@@ -287,7 +302,7 @@ mod tests {
         ret
     }
 
-    fn test_vector(n: usize, m: usize, seed: usize, vmax: usize, expected: Vec<usize>) {
+    fn test_vector(n: usize, m: usize, seed: usize, vmax: usize, expected: Vec<u64>) {
         let mut rng = CF896CRng(seed);
 
         let array = random_array(n, vmax, &mut rng);
@@ -309,7 +324,7 @@ mod tests {
                     output.push(n);
                 },
                 Op::PowSum(l, r, x, y) => {
-                    let z = tree.pow_sum(l - 1, r - 1, x as u32, y);
+                    let z = tree.pow_sum(l - 1, r - 1, x as u32, y as u64);
                     output.push(z);
                 },
             }
