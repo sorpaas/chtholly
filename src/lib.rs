@@ -72,7 +72,7 @@ impl ChthollyTree {
                 self.0[index].value = value;
                 self.0[index].right = right;
 
-                while self.0[index + 1].left <= right {
+                while index + 1 < self.0.len() && self.0[index + 1].left <= right {
                     self.0.remove(index + 1);
                 }
             },
@@ -288,10 +288,7 @@ mod tests {
     }
 
     fn test_vector(n: usize, m: usize, seed: usize, vmax: usize, expected: Vec<usize>) {
-        let n = 10;
-        let m = 10;
-        let mut rng = CF896CRng(7);
-        let vmax = 9;
+        let mut rng = CF896CRng(seed);
 
         let array = random_array(n, vmax, &mut rng);
         let ops = random_ops(n, m, vmax, &mut rng);
@@ -318,7 +315,7 @@ mod tests {
             }
         }
 
-        assert_eq!(output, vec![2, 1, 0, 3]);
+        assert_eq!(output, expected);
     }
 
     #[test]
