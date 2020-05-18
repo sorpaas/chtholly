@@ -1,0 +1,9 @@
+[package]
+name = "chtholly"
+version = "0.1.0"
+authors = ["Wei Tang <hi@that.world>"]
+edition = "2018"
+description = "Implementation of Chtholly Tree, a data structure originated from CF896C."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
